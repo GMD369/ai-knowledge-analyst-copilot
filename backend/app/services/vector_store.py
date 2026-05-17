@@ -1,4 +1,4 @@
-from uuid import uuid4, UUID
+from uuid import uuid4
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
@@ -7,7 +7,9 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
+    MatchAny,
     ScoredPoint,
+    FilterSelector,
 )
 from app.core.config import settings
 
@@ -38,13 +40,7 @@ async def ensure_collection() -> None:
         )
 
 
-async def upsert_chunks(
-    chunks_with_embeddings: list[dict],
-) -> list[str]:
-    """
-    Each item: {content, chunk_index, page_number, document_id, user_id, embedding}
-    Returns list of Qdrant point IDs (as strings).
-    """
+async def upsert_chunks(chunks_with_embeddings: list[dict]) -> list[str]:
     client = _get_client()
     await ensure_collection()
 
@@ -83,23 +79,26 @@ async def search(
 
     must = [FieldCondition(key="user_id", match=MatchValue(value=user_id))]
     if document_ids:
-        must.append(FieldCondition(key="document_id", match=MatchValue(value=document_ids)))
+        must.append(FieldCondition(key="document_id", match=MatchAny(any=document_ids)))
 
-    results = await client.search(
+    # query_points replaces the deprecated .search() in qdrant-client >= 1.7
+    response = await client.query_points(
         collection_name=settings.QDRANT_COLLECTION,
-        query_vector=query_vector,
+        query=query_vector,
         query_filter=Filter(must=must),
         limit=k,
         with_payload=True,
     )
-    return results
+    return response.points
 
 
 async def delete_by_document(document_id: str) -> None:
     client = _get_client()
     await client.delete(
         collection_name=settings.QDRANT_COLLECTION,
-        points_selector=Filter(
-            must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+        points_selector=FilterSelector(
+            filter=Filter(
+                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+            )
         ),
     )
