@@ -15,8 +15,9 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
     SUPABASE_ANON_KEY: str
 
-    # OpenAI
-    OPENAI_API_KEY: str
+    # Groq
+    GROQ_API_KEY: str
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     # Qdrant
     QDRANT_URL: str = "http://localhost:6333"
@@ -26,9 +27,9 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
 
-    # Embeddings
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
-    EMBEDDING_DIMENSION: int = 1536
+    # Embeddings — runs locally via sentence-transformers (no API key needed)
+    EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+    EMBEDDING_DIMENSION: int = 384
 
     # Chunking
     CHUNK_SIZE: int = 1000
