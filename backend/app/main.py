@@ -10,7 +10,7 @@ from app.api.v1.router import router
 async def lifespan(app: FastAPI):
     # startup
     yield
-    # shutdown
+
 
 
 app = FastAPI(
