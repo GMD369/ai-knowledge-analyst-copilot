@@ -1,0 +1,73 @@
+"use client"
+
+import { useEffect, useState, useCallback } from "react"
+import { motion } from "framer-motion"
+import { Files, RefreshCw } from "lucide-react"
+import { fetchDocuments } from "@/lib/api"
+import { UploadZone } from "./UploadZone"
+import { DocumentCard } from "./DocumentCard"
+import type { Document } from "@/lib/types"
+
+export function DocumentSidebar() {
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const docs = await fetchDocuments()
+      setDocuments(docs)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  // Poll every 8s to reflect processing status changes
+  useEffect(() => {
+    const hasPending = documents.some((d) => d.status === "pending" || d.status === "processing")
+    if (!hasPending) return
+    const interval = setInterval(load, 8000)
+    return () => clearInterval(interval)
+  }, [documents, load])
+
+  return (
+    <aside className="w-72 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col h-full">
+      <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Files className="h-4 w-4 text-slate-400" />
+          <span className="text-sm font-semibold text-slate-200">Documents</span>
+          <span className="text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded-full">
+            {documents.length}
+          </span>
+        </div>
+        <button onClick={load} className="text-slate-500 hover:text-slate-300 transition-colors">
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      <div className="p-3 border-b border-slate-800">
+        <UploadZone onUploaded={load} />
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-2">
+        {loading && documents.length === 0 ? (
+          <div className="flex flex-col gap-2 mt-2">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-14 bg-slate-800 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : documents.length === 0 ? (
+          <p className="text-slate-600 text-xs text-center mt-8">No documents yet. Upload one above.</p>
+        ) : (
+          <motion.div className="flex flex-col gap-1">
+            {documents.map((doc) => (
+              <DocumentCard key={doc.id} doc={doc} onDeleted={load} />
+            ))}
+          </motion.div>
+        )}
+      </div>
+    </aside>
+  )
+}
