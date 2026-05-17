@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"F:\\\\Web Development\\\\AI_Knowledge_Analyst_Copilot\\\\backend\" /b)"
+    ]
+  }
+}
