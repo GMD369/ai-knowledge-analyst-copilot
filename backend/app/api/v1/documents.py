@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from uuid import uuid4
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, BackgroundTasks
 
@@ -7,6 +8,18 @@ from app.core.supabase import get_supabase
 from app.models.document import DocumentListResponse, DocumentResponse, DocumentStatus
 from app.models.common import MessageResponse
 from app.services.ingestion import ingest_document
+
+logger = logging.getLogger(__name__)
+
+
+def _write_analytics(user_id: str, event_type: str, document_id: str = None, metadata: dict = {}) -> None:
+    try:
+        row = {"user_id": user_id, "event_type": event_type, "metadata": metadata}
+        if document_id:
+            row["document_id"] = document_id
+        get_supabase().table("analytics").insert(row).execute()
+    except Exception as e:
+        logger.warning(f"Analytics write failed: {e}")
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -71,6 +84,9 @@ async def upload_document(
     # Run ingestion pipeline in background
     background_tasks.add_task(ingest_document, document_id, user_id, file.filename, content)
 
+    _write_analytics(user_id, "upload", document_id=document_id,
+                     metadata={"filename": file.filename, "file_size": len(content)})
+
     return MessageResponse(message=f"'{file.filename}' uploaded and queued for processing.")
 
 
@@ -133,5 +149,7 @@ async def delete_document(document_id: str, current_user: dict = Depends(get_cur
 
     # Delete DB record (cascades to chunks)
     supabase.table("documents").delete().eq("id", document_id).execute()
+
+    _write_analytics(current_user["id"], "delete", document_id=document_id)
 
     return MessageResponse(message=f"Document {document_id} deleted.")

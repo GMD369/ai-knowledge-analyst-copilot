@@ -23,8 +23,18 @@ class ChatRequest(BaseModel):
     document_ids: Optional[list[str]] = None  # filter to specific docs
 
 
+class FeedbackRequest(BaseModel):
+    rating: int = Field(..., description="1 for thumbs up, -1 for thumbs down")
+    comment: Optional[str] = None
+
+    @property
+    def is_valid(self) -> bool:
+        return self.rating in (1, -1)
+
+
 class ChatResponse(BaseModel):
     conversation_id: str
+    message_id: str
     answer: str
     citations: list[Citation] = []
     confidence: float = Field(ge=0.0, le=1.0)

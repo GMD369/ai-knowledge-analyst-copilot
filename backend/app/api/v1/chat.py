@@ -1,10 +1,13 @@
+import logging
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.security import get_current_user
 from app.core.supabase import get_supabase
-from app.models.chat import ChatRequest, ChatResponse, ConversationResponse, ChatMessage, Citation
+from app.models.chat import ChatRequest, ChatResponse, ConversationResponse, ChatMessage, Citation, FeedbackRequest
 from app.services.rag.graph import run_rag
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -23,15 +26,28 @@ def _load_history(conversation_id: str, user_id: str) -> list[dict]:
     return resp.data or []
 
 
-def _save_message(conversation_id: str, user_id: str, role: str, content: str, extra: dict = {}) -> None:
+def _save_message(conversation_id: str, user_id: str, role: str, content: str, extra: dict = {}) -> str:
     supabase = get_supabase()
-    supabase.table("messages").insert({
+    result = supabase.table("messages").insert({
         "conversation_id": conversation_id,
         "user_id": user_id,
         "role": role,
         "content": content,
         **extra,
     }).execute()
+    return result.data[0]["id"]
+
+
+def _write_analytics(user_id: str, event_type: str, metadata: dict = {}, **ids) -> None:
+    try:
+        get_supabase().table("analytics").insert({
+            "user_id": user_id,
+            "event_type": event_type,
+            "metadata": metadata,
+            **ids,
+        }).execute()
+    except Exception as e:
+        logger.warning(f"Analytics write failed: {e}")
 
 
 @router.post("/", response_model=ChatResponse)
@@ -79,8 +95,8 @@ async def chat(
         document_ids=request.document_ids,
     )
 
-    # Save assistant message with citations
-    _save_message(
+    # Save assistant message and capture its ID for feedback
+    assistant_message_id = _save_message(
         conversation_id, user_id, "assistant", result["answer"],
         extra={
             "citations": result["citations"],
@@ -88,8 +104,12 @@ async def chat(
         },
     )
 
+    _write_analytics(user_id, "query", conversation_id=conversation_id,
+                     metadata={"confidence": result["confidence"], "doc_count": len(request.document_ids or [])})
+
     return ChatResponse(
         conversation_id=conversation_id,
+        message_id=assistant_message_id,
         answer=result["answer"],
         citations=[Citation(**c) for c in result["citations"]],
         confidence=result["confidence"],
@@ -166,3 +186,31 @@ async def delete_conversation(conversation_id: str, current_user: dict = Depends
 
     supabase.table("conversations").delete().eq("id", conversation_id).execute()
     return {"message": "Conversation deleted."}
+
+
+@router.post("/messages/{message_id}/feedback", status_code=status.HTTP_201_CREATED)
+async def submit_feedback(
+    message_id: str,
+    body: FeedbackRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    if body.rating not in (1, -1):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Rating must be 1 or -1.")
+
+    supabase = get_supabase()
+    user_id = current_user["id"]
+
+    msg = supabase.table("messages").select("id").eq("id", message_id).eq("user_id", user_id).execute()
+    if not msg.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")
+
+    # Upsert so re-voting updates rather than duplicates
+    supabase.table("feedback").upsert({
+        "user_id": user_id,
+        "message_id": message_id,
+        "rating": body.rating,
+        "comment": body.comment,
+    }, on_conflict="user_id,message_id").execute()
+
+    _write_analytics(user_id, "feedback", metadata={"rating": body.rating, "message_id": message_id})
+    return {"message": "Feedback recorded."}

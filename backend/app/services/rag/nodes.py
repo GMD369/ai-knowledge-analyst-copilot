@@ -2,7 +2,6 @@ import logging
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from app.core.llm import get_llm
 from app.core.supabase import get_supabase
-from app.services.embedder import embed_query
 from app.services.vector_store import search
 from app.services.rag.state import RAGState, RetrievedChunk
 
@@ -43,6 +42,7 @@ Rewritten query:"""
 # ── Node 2: Retriever ─────────────────────────────────────────────────────────
 
 async def retriever(state: RAGState) -> dict:
+    from app.services.embedder import embed_query
     query_text = state.get("rewritten_query") or state["query"]
     query_vector = await embed_query(query_text)
 

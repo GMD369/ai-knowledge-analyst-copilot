@@ -74,7 +74,8 @@ create table public.feedback (
     message_id uuid not null references public.messages(id) on delete cascade,
     rating     int not null check (rating in (1, -1)),  -- 1 = thumbs up, -1 = thumbs down
     comment    text,
-    created_at timestamptz not null default now()
+    created_at timestamptz not null default now(),
+    unique (user_id, message_id)
 );
 
 -- ============================================================
