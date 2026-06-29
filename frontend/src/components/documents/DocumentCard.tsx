@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils"
 
 interface Props {
   doc: Document
+  selected: boolean
+  onToggle: (id: string) => void
   onDeleted: () => void
 }
 
@@ -26,7 +28,7 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function DocumentCard({ doc, onDeleted }: Props) {
+export function DocumentCard({ doc, selected, onToggle, onDeleted }: Props) {
   const [deleting, setDeleting] = useState(false)
   const config = statusConfig[doc.status]
   const StatusIcon = config.icon
@@ -46,9 +48,24 @@ export function DocumentCard({ doc, onDeleted }: Props) {
     <motion.div
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
-      className="group flex items-start gap-3 p-3 rounded-lg hover:bg-slate-800/60 transition-colors"
+      className={cn(
+        "group flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer",
+        selected ? "bg-violet-500/10 border border-violet-500/20" : "hover:bg-slate-800/60 border border-transparent"
+      )}
+      onClick={() => doc.status === "ready" && onToggle(doc.id)}
     >
-      <FileText className="h-5 w-5 text-slate-500 mt-0.5 flex-shrink-0" />
+      <div className="flex-shrink-0 mt-0.5">
+        {doc.status === "ready" ? (
+          <div className={cn(
+            "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+            selected ? "bg-violet-600 border-violet-500" : "border-slate-600 bg-slate-800"
+          )}>
+            {selected && <span className="text-white text-xs font-bold leading-none">✓</span>}
+          </div>
+        ) : (
+          <FileText className="h-5 w-5 text-slate-500" />
+        )}
+      </div>
       <div className="flex-1 min-w-0">
         <p className="text-slate-200 text-sm truncate font-medium">{doc.filename}</p>
         <div className="flex items-center gap-2 mt-1">
@@ -63,7 +80,7 @@ export function DocumentCard({ doc, onDeleted }: Props) {
         </div>
       </div>
       <button
-        onClick={handleDelete}
+        onClick={(e) => { e.stopPropagation(); handleDelete(e) }}
         disabled={deleting}
         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-600 hover:text-red-400"
       >

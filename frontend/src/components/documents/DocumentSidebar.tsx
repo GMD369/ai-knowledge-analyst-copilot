@@ -8,7 +8,12 @@ import { UploadZone } from "./UploadZone"
 import { DocumentCard } from "./DocumentCard"
 import type { Document } from "@/lib/types"
 
-export function DocumentSidebar() {
+interface Props {
+  selectedIds: Set<string>
+  onToggle: (id: string) => void
+}
+
+export function DocumentSidebar({ selectedIds, onToggle }: Props) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +50,11 @@ export function DocumentSidebar() {
           <span className="text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded-full">
             {documents.length}
           </span>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-violet-400 bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 rounded-full">
+              {selectedIds.size} selected
+            </span>
+          )}
         </div>
         <button onClick={load} className="text-slate-500 hover:text-slate-300 transition-colors">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -69,11 +79,22 @@ export function DocumentSidebar() {
         ) : (
           <motion.div className="flex flex-col gap-1">
             {documents.map((doc) => (
-              <DocumentCard key={doc.id} doc={doc} onDeleted={load} />
+              <DocumentCard
+                key={doc.id}
+                doc={doc}
+                selected={selectedIds.has(doc.id)}
+                onToggle={onToggle}
+                onDeleted={load}
+              />
             ))}
           </motion.div>
         )}
       </div>
+      {documents.some(d => d.status === "ready") && (
+        <p className="text-slate-600 text-xs text-center py-2 px-3 border-t border-slate-800">
+          Check docs to filter chat
+        </p>
+      )}
     </aside>
   )
 }

@@ -73,3 +73,12 @@ export async function deleteConversation(id: string): Promise<void> {
   const headers = await getAuthHeaders()
   await fetch(`${API_URL}/api/v1/chat/conversations/${id}`, { method: "DELETE", headers })
 }
+
+export async function submitFeedback(messageId: string, rating: 1 | -1): Promise<void> {
+  const headers = await getAuthHeaders()
+  await fetch(`${API_URL}/api/v1/chat/messages/${messageId}/feedback`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ rating }),
+  })
+}

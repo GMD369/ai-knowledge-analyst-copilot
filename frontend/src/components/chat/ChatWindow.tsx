@@ -2,18 +2,24 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Brain, MessageSquarePlus } from "lucide-react"
+import { Brain, MessageSquarePlus, History } from "lucide-react"
 import { MessageBubble } from "./MessageBubble"
 import { ChatInput } from "./ChatInput"
 import { CitationPanel } from "./CitationPanel"
-import { sendMessage } from "@/lib/api"
-import type { Message, Citation } from "@/lib/types"
+import { ConversationList } from "./ConversationList"
+import { sendMessage, fetchConversation } from "@/lib/api"
+import type { Message, Citation, Conversation } from "@/lib/types"
 
-export function ChatWindow() {
+interface Props {
+  selectedDocumentIds: Set<string>
+}
+
+export function ChatWindow({ selectedDocumentIds }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [conversationId, setConversationId] = useState<string | undefined>()
   const [activeCitations, setActiveCitations] = useState<Citation[] | null>(null)
   const [thinking, setThinking] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -31,11 +37,13 @@ export function ChatWindow() {
     setThinking(true)
 
     try {
-      const result = await sendMessage(text, conversationId)
+      const docIds = selectedDocumentIds.size > 0 ? Array.from(selectedDocumentIds) : undefined
+      const result = await sendMessage(text, conversationId, docIds)
       if (!conversationId) setConversationId(result.conversation_id)
 
       const assistantMsg: Message = {
         id: crypto.randomUUID(),
+        message_id: result.message_id,
         role: "assistant",
         content: result.answer,
         citations: result.citations,
@@ -54,7 +62,7 @@ export function ChatWindow() {
     } finally {
       setThinking(false)
     }
-  }, [conversationId])
+  }, [conversationId, selectedDocumentIds])
 
   function newChat() {
     setMessages([])
@@ -62,18 +70,76 @@ export function ChatWindow() {
     setActiveCitations(null)
   }
 
+  async function handleSelectConversation(conv: Conversation) {
+    try {
+      const full = await fetchConversation(conv.id)
+      setConversationId(full.id)
+      setMessages(
+        full.messages.map((m, i) => ({
+          id: crypto.randomUUID(),
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          created_at: m.created_at ?? new Date().toISOString(),
+        }))
+      )
+      setActiveCitations(null)
+    } catch {
+      // ignore — conversation may have been deleted
+    }
+  }
+
   return (
     <div className="flex flex-1 overflow-hidden">
+      {/* Conversation history panel */}
+      <AnimatePresence>
+        {showHistory && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 224, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden flex-shrink-0"
+          >
+            <ConversationList
+              activeId={conversationId}
+              onSelect={handleSelectConversation}
+              onNew={newChat}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main chat area */}
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-slate-800 bg-slate-900">
-          <div className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-violet-400" />
-            <span className="text-sm font-semibold text-slate-200">
-              {conversationId ? "Active conversation" : "New conversation"}
-            </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowHistory((v) => !v)}
+              className={`flex items-center gap-1.5 text-xs transition-colors px-2.5 py-1.5 rounded-lg ${
+                showHistory
+                  ? "text-violet-400 bg-violet-500/10 border border-violet-500/20"
+                  : "text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700"
+              }`}
+            >
+              <History className="h-3.5 w-3.5" />
+              History
+            </button>
+
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-violet-400" />
+              <span className="text-sm font-semibold text-slate-200">
+                {conversationId ? "Active conversation" : "New conversation"}
+              </span>
+            </div>
+
+            {selectedDocumentIds.size > 0 && (
+              <span className="text-xs text-violet-300 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full">
+                {selectedDocumentIds.size} doc{selectedDocumentIds.size > 1 ? "s" : ""} selected
+              </span>
+            )}
           </div>
+
           <button
             onClick={newChat}
             className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg"
@@ -109,7 +175,6 @@ export function ChatWindow() {
             />
           ))}
 
-          {/* Thinking indicator */}
           <AnimatePresence>
             {thinking && (
               <motion.div

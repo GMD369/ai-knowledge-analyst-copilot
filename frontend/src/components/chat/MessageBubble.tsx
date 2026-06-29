@@ -1,9 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import { motion } from "framer-motion"
-import { Brain, User, BookOpen } from "lucide-react"
+import { Brain, User, BookOpen, ThumbsUp, ThumbsDown } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { submitFeedback } from "@/lib/api"
 import type { Message } from "@/lib/types"
 
 interface Props {
@@ -13,6 +15,17 @@ interface Props {
 
 export function MessageBubble({ message, onShowCitations }: Props) {
   const isUser = message.role === "user"
+  const [feedback, setFeedback] = useState<1 | -1 | null>(message.feedback ?? null)
+
+  async function handleFeedback(rating: 1 | -1) {
+    if (!message.message_id || feedback !== null) return
+    setFeedback(rating)
+    try {
+      await submitFeedback(message.message_id, rating)
+    } catch {
+      setFeedback(null)
+    }
+  }
 
   return (
     <motion.div
@@ -41,19 +54,54 @@ export function MessageBubble({ message, onShowCitations }: Props) {
           {message.content}
         </div>
 
-        {!isUser && message.citations && message.citations.length > 0 && (
-          <button
-            onClick={() => onShowCitations(message)}
-            className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 transition-colors"
-          >
-            <BookOpen className="h-3 w-3" />
-            {message.citations.length} source{message.citations.length > 1 ? "s" : ""}
-            {message.confidence !== undefined && (
-              <Badge variant="outline" className="ml-1 text-xs bg-slate-800 text-slate-400 border-slate-700 px-1.5 py-0">
-                {Math.round(message.confidence * 100)}% confidence
-              </Badge>
+        {!isUser && (
+          <div className="flex items-center gap-3">
+            {message.citations && message.citations.length > 0 && (
+              <button
+                onClick={() => onShowCitations(message)}
+                className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                <BookOpen className="h-3 w-3" />
+                {message.citations.length} source{message.citations.length > 1 ? "s" : ""}
+                {message.confidence !== undefined && (
+                  <Badge variant="outline" className="ml-1 text-xs bg-slate-800 text-slate-400 border-slate-700 px-1.5 py-0">
+                    {Math.round(message.confidence * 100)}% confidence
+                  </Badge>
+                )}
+              </button>
             )}
-          </button>
+
+            {message.message_id && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleFeedback(1)}
+                  disabled={feedback !== null}
+                  className={cn(
+                    "p-1 rounded transition-colors",
+                    feedback === 1
+                      ? "text-green-400"
+                      : "text-slate-600 hover:text-green-400 disabled:cursor-default"
+                  )}
+                  title="Good answer"
+                >
+                  <ThumbsUp className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => handleFeedback(-1)}
+                  disabled={feedback !== null}
+                  className={cn(
+                    "p-1 rounded transition-colors",
+                    feedback === -1
+                      ? "text-red-400"
+                      : "text-slate-600 hover:text-red-400 disabled:cursor-default"
+                  )}
+                  title="Bad answer"
+                >
+                  <ThumbsDown className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </motion.div>

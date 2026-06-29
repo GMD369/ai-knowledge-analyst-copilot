@@ -20,10 +20,12 @@ export interface Citation {
 
 export interface Message {
   id: string
+  message_id?: string
   role: "user" | "assistant"
   content: string
   citations?: Citation[]
   confidence?: number
+  feedback?: 1 | -1
   created_at: string
 }
 
@@ -37,6 +39,7 @@ export interface Conversation {
 
 export interface ChatResponse {
   conversation_id: string
+  message_id: string
   answer: string
   citations: Citation[]
   confidence: number
