@@ -4,11 +4,13 @@ import type { Document, ChatResponse, Conversation } from "@/lib/types"
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 
 async function getAuthHeaders(): Promise<HeadersInit> {
-  const supabase = createClient()
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  return {
-    Authorization: `Bearer ${token}`,
+  try {
+    const supabase = createClient()
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
   }
 }
 

@@ -34,8 +34,12 @@ export function DocumentCard({ doc, onDeleted }: Props) {
   async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation()
     setDeleting(true)
-    await deleteDocument(doc.id)
-    onDeleted()
+    try {
+      await deleteDocument(doc.id)
+      onDeleted()
+    } catch {
+      setDeleting(false)
+    }
   }
 
   return (

@@ -11,12 +11,16 @@ import type { Document } from "@/lib/types"
 export function DocumentSidebar() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const docs = await fetchDocuments()
       setDocuments(docs)
+    } catch (e: any) {
+      setError(e.message ?? "Failed to load documents")
     } finally {
       setLoading(false)
     }
@@ -58,6 +62,8 @@ export function DocumentSidebar() {
               <div key={i} className="h-14 bg-slate-800 rounded-lg animate-pulse" />
             ))}
           </div>
+        ) : error ? (
+          <p className="text-red-500 text-xs text-center mt-8 px-2">{error}</p>
         ) : documents.length === 0 ? (
           <p className="text-slate-600 text-xs text-center mt-8">No documents yet. Upload one above.</p>
         ) : (
