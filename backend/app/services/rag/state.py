@@ -36,3 +36,4 @@ class RAGState(TypedDict):
     answer: str
     citations: list[CitationDict]
     confidence: float
+    tokens_used: Optional[int]

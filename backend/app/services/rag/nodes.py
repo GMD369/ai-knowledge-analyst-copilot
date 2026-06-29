@@ -155,8 +155,10 @@ Answer (cite sources using [1], [2], etc.):"""))
                 "relevance_score": round(chunk["score"], 4),
             })
 
-    logger.info(f"Generated answer with {len(citations)} citations.")
-    return {"answer": answer, "citations": citations}
+    usage = response.response_metadata.get("token_usage", {})
+    tokens_used = usage.get("total_tokens")
+    logger.info(f"Generated answer with {len(citations)} citations, {tokens_used} tokens.")
+    return {"answer": answer, "citations": citations, "tokens_used": tokens_used}
 
 
 # ── Node 5: Confidence Evaluator ─────────────────────────────────────────────

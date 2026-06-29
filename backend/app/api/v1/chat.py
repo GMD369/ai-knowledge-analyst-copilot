@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.security import get_current_user
 from app.core.supabase import get_supabase
-from app.models.chat import ChatRequest, ChatResponse, ConversationResponse, ChatMessage, Citation, FeedbackRequest
+from app.models.chat import ChatRequest, ChatResponse, ConversationResponse, ChatMessage, Citation, FeedbackRequest, ConversationUpdateRequest
 from app.services.rag.graph import run_rag
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,7 @@ async def chat(
         extra={
             "citations": result["citations"],
             "confidence": result["confidence"],
+            "tokens_used": result.get("tokens_used"),
         },
     )
 
@@ -113,6 +114,7 @@ async def chat(
         answer=result["answer"],
         citations=[Citation(**c) for c in result["citations"]],
         confidence=result["confidence"],
+        tokens_used=result.get("tokens_used"),
     )
 
 
@@ -169,6 +171,26 @@ async def get_conversation(conversation_id: str, current_user: dict = Depends(ge
         messages=[ChatMessage(**m) for m in messages_resp.data],
         created_at=conv.data["created_at"],
     )
+
+
+@router.patch("/conversations/{conversation_id}")
+async def rename_conversation(
+    conversation_id: str,
+    body: ConversationUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    supabase = get_supabase()
+    existing = (
+        supabase.table("conversations")
+        .select("id")
+        .eq("id", conversation_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not existing.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+    supabase.table("conversations").update({"title": body.title}).eq("id", conversation_id).execute()
+    return {"message": "Conversation renamed."}
 
 
 @router.delete("/conversations/{conversation_id}")

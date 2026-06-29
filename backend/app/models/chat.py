@@ -23,6 +23,10 @@ class ChatRequest(BaseModel):
     document_ids: Optional[list[str]] = None  # filter to specific docs
 
 
+class ConversationUpdateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
+
+
 class FeedbackRequest(BaseModel):
     rating: int = Field(..., description="1 for thumbs up, -1 for thumbs down")
     comment: Optional[str] = None

@@ -153,3 +153,44 @@ async def delete_document(document_id: str, current_user: dict = Depends(get_cur
     _write_analytics(current_user["id"], "delete", document_id=document_id)
 
     return MessageResponse(message=f"Document {document_id} deleted.")
+
+
+@router.post("/{document_id}/reingest", response_model=MessageResponse, status_code=status.HTTP_202_ACCEPTED)
+async def reingest_document(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
+    from app.services.vector_store import delete_by_document
+
+    supabase = get_supabase()
+    user_id = current_user["id"]
+
+    response = (
+        supabase.table("documents")
+        .select("id, filename, storage_path, status")
+        .eq("id", document_id)
+        .eq("user_id", user_id)
+        .single()
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
+
+    doc = response.data
+    if doc["status"] == "processing":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Document is already being processed.")
+
+    # Delete existing vectors and chunks so we start clean
+    await delete_by_document(document_id)
+    supabase.table("chunks").delete().eq("document_id", document_id).execute()
+
+    # Download file from Supabase Storage
+    content = supabase.storage.from_("documents").download(doc["storage_path"])
+
+    # Reset status and re-run pipeline
+    supabase.table("documents").update({"status": "pending", "chunk_count": 0, "error_msg": None}).eq("id", document_id).execute()
+    background_tasks.add_task(ingest_document, document_id, user_id, doc["filename"], content)
+
+    _write_analytics(user_id, "reingest", document_id=document_id)
+    return MessageResponse(message=f"Document '{doc['filename']}' queued for re-processing.")

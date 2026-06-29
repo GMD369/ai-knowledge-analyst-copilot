@@ -70,6 +70,7 @@ async def run_rag(
         "answer": "",
         "citations": [],
         "confidence": 0.0,
+        "tokens_used": None,
     }
 
     final_state = await compiled.ainvoke(initial_state)
@@ -78,4 +79,5 @@ async def run_rag(
         "answer": final_state["answer"],
         "citations": final_state["citations"],
         "confidence": final_state["confidence"],
+        "tokens_used": final_state.get("tokens_used"),
     }
