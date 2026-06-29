@@ -2,9 +2,9 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { FileText, Trash2, Loader2, CheckCircle, AlertCircle, Clock } from "lucide-react"
+import { FileText, Trash2, Loader2, CheckCircle, AlertCircle, Clock, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { deleteDocument } from "@/lib/api"
+import { deleteDocument, reIngestDocument } from "@/lib/api"
 import type { Document } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -30,6 +30,7 @@ function formatSize(bytes: number) {
 
 export function DocumentCard({ doc, selected, onToggle, onDeleted }: Props) {
   const [deleting, setDeleting] = useState(false)
+  const [reingesting, setReingesting] = useState(false)
   const config = statusConfig[doc.status]
   const StatusIcon = config.icon
 
@@ -41,6 +42,17 @@ export function DocumentCard({ doc, selected, onToggle, onDeleted }: Props) {
       onDeleted()
     } catch {
       setDeleting(false)
+    }
+  }
+
+  async function handleReingest(e: React.MouseEvent) {
+    e.stopPropagation()
+    setReingesting(true)
+    try {
+      await reIngestDocument(doc.id)
+      onDeleted() // refresh list
+    } catch {
+      setReingesting(false)
     }
   }
 
@@ -79,13 +91,26 @@ export function DocumentCard({ doc, selected, onToggle, onDeleted }: Props) {
           )}
         </div>
       </div>
-      <button
-        onClick={(e) => { e.stopPropagation(); handleDelete(e) }}
-        disabled={deleting}
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-600 hover:text-red-400"
-      >
-        {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-      </button>
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {doc.status === "failed" && (
+          <button
+            onClick={handleReingest}
+            disabled={reingesting}
+            className="p-1 text-slate-600 hover:text-violet-400"
+            title="Re-process"
+          >
+            {reingesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </button>
+        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); handleDelete(e) }}
+          disabled={deleting}
+          className="p-1 text-slate-600 hover:text-red-400"
+          title="Delete"
+        >
+          {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        </button>
+      </div>
     </motion.div>
   )
 }

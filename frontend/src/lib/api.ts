@@ -74,6 +74,22 @@ export async function deleteConversation(id: string): Promise<void> {
   await fetch(`${API_URL}/api/v1/chat/conversations/${id}`, { method: "DELETE", headers })
 }
 
+export async function reIngestDocument(id: string): Promise<{ message: string }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_URL}/api/v1/documents/${id}/reingest`, { method: "POST", headers })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function updateConversationTitle(id: string, title: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  await fetch(`${API_URL}/api/v1/chat/conversations/${id}`, {
+    method: "PATCH",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  })
+}
+
 export async function submitFeedback(messageId: string, rating: 1 | -1): Promise<void> {
   const headers = await getAuthHeaders()
   await fetch(`${API_URL}/api/v1/chat/messages/${messageId}/feedback`, {

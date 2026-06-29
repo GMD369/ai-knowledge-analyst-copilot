@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { motion } from "framer-motion"
-import { MessageSquare, Trash2, Loader2, Plus } from "lucide-react"
-import { fetchConversations, deleteConversation } from "@/lib/api"
+import { MessageSquare, Trash2, Loader2, Plus, Pencil, Check, X } from "lucide-react"
+import { fetchConversations, deleteConversation, updateConversationTitle } from "@/lib/api"
 import type { Conversation } from "@/lib/types"
 
 interface Props {
@@ -16,6 +16,8 @@ export function ConversationList({ activeId, onSelect, onNew }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState("")
 
   const load = useCallback(async () => {
     try {
@@ -42,6 +44,26 @@ export function ConversationList({ activeId, onSelect, onNew }: Props) {
     } finally {
       setDeletingId(null)
     }
+  }
+
+  function startEdit(e: React.MouseEvent, conv: Conversation) {
+    e.stopPropagation()
+    setEditingId(conv.id)
+    setEditTitle(conv.title || "")
+  }
+
+  async function saveEdit(id: string) {
+    const title = editTitle.trim()
+    if (title) {
+      await updateConversationTitle(id, title)
+      setConversations((prev) => prev.map((c) => c.id === id ? { ...c, title } : c))
+    }
+    setEditingId(null)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditTitle("")
   }
 
   function formatDate(iso: string) {
@@ -95,20 +117,38 @@ export function ConversationList({ activeId, onSelect, onNew }: Props) {
               }`}
             >
               <div className="flex items-start justify-between gap-1">
-                <p className={`text-xs font-medium truncate flex-1 leading-snug ${
-                  activeId === conv.id ? "text-violet-300" : "text-slate-300"
-                }`}>
-                  {conv.title || "Untitled"}
-                </p>
-                <button
-                  onClick={(e) => handleDelete(e, conv.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-slate-600 hover:text-red-400 mt-0.5"
-                >
-                  {deletingId === conv.id
-                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                    : <Trash2 className="h-3 w-3" />
-                  }
-                </button>
+                {editingId === conv.id ? (
+                  <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      autoFocus
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit(conv.id)
+                        if (e.key === "Escape") cancelEdit()
+                      }}
+                      className="flex-1 text-xs bg-slate-700 border border-violet-500 rounded px-1.5 py-0.5 text-white outline-none min-w-0"
+                    />
+                    <button onClick={() => saveEdit(conv.id)} className="text-green-400 flex-shrink-0"><Check className="h-3 w-3" /></button>
+                    <button onClick={cancelEdit} className="text-slate-500 flex-shrink-0"><X className="h-3 w-3" /></button>
+                  </div>
+                ) : (
+                  <>
+                    <p className={`text-xs font-medium truncate flex-1 leading-snug ${
+                      activeId === conv.id ? "text-violet-300" : "text-slate-300"
+                    }`}>
+                      {conv.title || "Untitled"}
+                    </p>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button onClick={(e) => startEdit(e, conv)} className="text-slate-600 hover:text-slate-300 mt-0.5">
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button onClick={(e) => handleDelete(e, conv.id)} className="text-slate-600 hover:text-red-400 mt-0.5">
+                        {deletingId === conv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
               <p className="text-slate-600 text-xs">{formatDate(conv.created_at)}</p>
             </motion.div>

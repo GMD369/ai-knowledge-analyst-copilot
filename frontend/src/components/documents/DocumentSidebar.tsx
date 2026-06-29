@@ -11,9 +11,11 @@ import type { Document } from "@/lib/types"
 interface Props {
   selectedIds: Set<string>
   onToggle: (id: string) => void
+  open?: boolean
+  onClose?: () => void
 }
 
-export function DocumentSidebar({ selectedIds, onToggle }: Props) {
+export function DocumentSidebar({ selectedIds, onToggle, open = false, onClose }: Props) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -42,7 +44,20 @@ export function DocumentSidebar({ selectedIds, onToggle }: Props) {
   }, [documents, load])
 
   return (
-    <aside className="w-72 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col h-full">
+    <>
+      {/* Mobile backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={onClose}
+        />
+      )}
+    <aside className={`
+      w-72 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col h-full
+      fixed md:relative inset-y-0 left-0 z-40
+      transition-transform duration-200
+      ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+    `}>
       <div className="p-4 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Files className="h-4 w-4 text-slate-400" />
@@ -96,5 +111,6 @@ export function DocumentSidebar({ selectedIds, onToggle }: Props) {
         </p>
       )}
     </aside>
+    </>
   )
 }
