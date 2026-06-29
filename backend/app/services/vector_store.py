@@ -1,5 +1,6 @@
 from uuid import uuid4
 from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
     Distance,
     VectorParams,
@@ -81,24 +82,33 @@ async def search(
     if document_ids:
         must.append(FieldCondition(key="document_id", match=MatchAny(any=document_ids)))
 
-    # query_points replaces the deprecated .search() in qdrant-client >= 1.7
-    response = await client.query_points(
-        collection_name=settings.QDRANT_COLLECTION,
-        query=query_vector,
-        query_filter=Filter(must=must),
-        limit=k,
-        with_payload=True,
-    )
-    return response.points
+    try:
+        # query_points replaces the deprecated .search() in qdrant-client >= 1.7
+        response = await client.query_points(
+            collection_name=settings.QDRANT_COLLECTION,
+            query=query_vector,
+            query_filter=Filter(must=must),
+            limit=k,
+            with_payload=True,
+        )
+        return response.points
+    except UnexpectedResponse as e:
+        if e.status_code == 404:
+            return []
+        raise
 
 
 async def delete_by_document(document_id: str) -> None:
     client = _get_client()
-    await client.delete(
-        collection_name=settings.QDRANT_COLLECTION,
-        points_selector=FilterSelector(
-            filter=Filter(
-                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
-            )
-        ),
-    )
+    try:
+        await client.delete(
+            collection_name=settings.QDRANT_COLLECTION,
+            points_selector=FilterSelector(
+                filter=Filter(
+                    must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+                )
+            ),
+        )
+    except UnexpectedResponse as e:
+        if e.status_code != 404:
+            raise
